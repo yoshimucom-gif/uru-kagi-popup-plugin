@@ -1,8 +1,8 @@
 <?php
 /**
  * Plugin Name: 不動産売却のカギ ポップアップ
- * Description: 右下スライドイン型ポップアップ。画像モード（画像＋リンクURL）とショートコードモード（任意HTML）を切替可能。スクロールで表示、×で閉じたらセッション中は再表示しない。
- * Version: 1.0.1
+ * Description: 右下スライドイン型ポップアップ。画像モード（画像＋リンクURL）とショートコードモード（任意HTML）を切替可能。ページを何%読んだら表示するかを指定でき、×で閉じたらセッション中は再表示しない。
+ * Version: 1.1.0
  * Author: 不動産売却のカギ
  * License: GPLv2 or later
  * Text Domain: uru-kagi-popup
@@ -10,7 +10,7 @@
 
 if (!defined('ABSPATH')) exit;
 
-define('UKGI_VER', '1.0.1');
+define('UKGI_VER', '1.1.0');
 
 /**
  * 自動更新の置き場（update.json の URL）。
@@ -37,7 +37,7 @@ class Uru_Kagi_Popup {
             'link_url'       => '',
             'link_blank'     => 0,
             'shortcode_html' => '',
-            'scroll_px'      => 300,            // 表示トリガー（スクロール量px）
+            'scroll_pct'     => 30,             // 表示トリガー（ページを何%読んだら出すか）
             'width'          => 320,            // ポップアップ幅px（PC）
             'scope'          => 'all',          // all | posts | front
             'show_mobile'    => 1,
@@ -70,7 +70,10 @@ class Uru_Kagi_Popup {
         $d = self::defaults();
         $out = array();
         $out['enabled']        = empty($in['enabled']) ? 0 : 1;
-        $out['mode']           = in_array($in['mode'] ?? 'image', array('image','shortcode'), true) ? $in['mode'] : 'image';
+        // ?? は必ず変数に受けてから判定する（三項の判定側だけに付けると、
+        //   項目が送られてこなかったときに未定義キーを読んで null が保存される）
+        $mode                  = $in['mode'] ?? 'image';
+        $out['mode']           = in_array($mode, array('image','shortcode'), true) ? $mode : 'image';
         $out['image_url']      = esc_url_raw($in['image_url'] ?? '');
         $out['image_alt']      = sanitize_text_field($in['image_alt'] ?? '');
         $out['link_url']       = esc_url_raw($in['link_url'] ?? '');
@@ -79,9 +82,11 @@ class Uru_Kagi_Popup {
         $out['shortcode_html'] = current_user_can('unfiltered_html')
             ? (string)($in['shortcode_html'] ?? '')
             : wp_kses_post($in['shortcode_html'] ?? '');
-        $out['scroll_px']      = max(0, intval($in['scroll_px'] ?? $d['scroll_px']));
+        // 旧版（px指定）から更新した場合は、保存されていた px を捨てて既定の%に戻す
+        $out['scroll_pct']     = min(100, max(0, intval($in['scroll_pct'] ?? $d['scroll_pct'])));
         $out['width']          = min(600, max(200, intval($in['width'] ?? $d['width'])));
-        $out['scope']          = in_array($in['scope'] ?? 'all', array('all','posts','front'), true) ? $in['scope'] : 'all';
+        $scope                 = $in['scope'] ?? 'all';
+        $out['scope']          = in_array($scope, array('all','posts','front'), true) ? $scope : 'all';
         $out['show_mobile']    = empty($in['show_mobile']) ? 0 : 1;
         $out['version']        = max(1, intval($in['version'] ?? 1));
         return $out;
@@ -140,7 +145,14 @@ class Uru_Kagi_Popup {
                     </tr>
                     <tr>
                         <th scope="row">表示タイミング</th>
-                        <td><input type="number" name="<?php echo self::OPT; ?>[scroll_px]" value="<?php echo esc_attr($o['scroll_px']); ?>" min="0" step="50" style="width:100px;"> px スクロールしたら表示（0=即表示）</td>
+                        <td>
+                            ページを <input type="number" name="<?php echo self::OPT; ?>[scroll_pct]" value="<?php echo esc_attr($o['scroll_pct']); ?>" min="0" max="100" step="5" style="width:80px;"> % 読んだら表示
+                            <p class="description">
+                                記事の長さに関わらず「どこまで読んだか」で出せます。<br>
+                                0＝ページを開いた直後／30＝3割ほど読んだところ（おすすめ）／50＝ちょうど半分／100＝ページの一番下。<br>
+                                ※スクロールが起きない短いページでは、開いた直後に表示します。
+                            </p>
+                        </td>
                     </tr>
                     <tr>
                         <th scope="row">幅（PC）</th>
@@ -248,17 +260,30 @@ class Uru_Kagi_Popup {
                 el.style.pointerEvents = 'auto';
                 el.setAttribute('aria-hidden','false');
             }
-            var th = <?php echo intval($o['scroll_px']); ?>;
-            if (th <= 0) { show(); }
-            else {
-                function onScroll(){
-                    if ((window.pageYOffset || document.documentElement.scrollTop) >= th) {
-                        show(); window.removeEventListener('scroll', onScroll);
-                    }
-                }
-                window.addEventListener('scroll', onScroll, {passive:true});
-                onScroll();
+            var th = <?php echo intval($o['scroll_pct']); ?>;
+            // ページ全体のどこまで読んだかを % で返す。
+            // スクロールできない短いページは「すでに全部見えている」＝100% とみなす。
+            function progress(){
+                var doc = document.documentElement, body = document.body;
+                var h = Math.max(body ? body.scrollHeight : 0, doc.scrollHeight,
+                                 body ? body.offsetHeight : 0, doc.offsetHeight);
+                var scrollable = h - window.innerHeight;
+                if (scrollable <= 0) return 100;
+                var y = window.pageYOffset || doc.scrollTop || 0;
+                return Math.min(100, y / scrollable * 100);
             }
+            function cleanup(){
+                window.removeEventListener('scroll', check);
+                window.removeEventListener('resize', check);
+            }
+            function check(){ if (progress() >= th) { show(); cleanup(); } }
+            window.addEventListener('scroll', check, {passive:true});
+            window.addEventListener('resize', check);
+            // 画像の読み込みでページの高さは変わるため、初回判定は読み込み完了後に行う
+            // （高さが確定する前に測ると、長い記事でもいきなり出てしまう）
+            if (th <= 0) { show(); cleanup(); }
+            else if (document.readyState === 'complete') { check(); }
+            else { window.addEventListener('load', check); }
             document.getElementById('ukgi-popup-close').addEventListener('click', function(){
                 el.style.opacity = '0';
                 el.style.transform = 'translateY(12px)';

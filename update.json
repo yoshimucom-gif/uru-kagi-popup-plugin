@@ -1,6 +1,6 @@
 {
   "name": "不動産売却のカギ ポップアップ",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "download_url": "https://raw.githubusercontent.com/yoshimucom-gif/uru-kagi-popup-plugin/main/uru-kagi-popup.zip",
   "requires": "5.8",
   "tested": "6.7",
@@ -8,6 +8,6 @@
   "author": "ミカタ株式会社",
   "homepage": "https://github.com/yoshimucom-gif/uru-kagi-popup-plugin",
   "sections": {
-    "changelog": "1.0.1\n・WordPress管理画面からのワンクリック更新（自動更新）に対応しました"
+    "changelog": "1.1.0\n・表示タイミングをpx指定から「ページを何%読んだら出すか」に変更しました（既定30%）\n・設定画面に未送信の項目があるとPHPの警告が出て、表示モード・表示するページの設定が空になる不具合を修正しました"
   }
 }

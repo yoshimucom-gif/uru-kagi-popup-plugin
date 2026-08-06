@@ -30,8 +30,25 @@ WordPress は最大12時間ごとに更新チェックするため、すぐ見�
 3. `uru-kagi-popup.zip` を再生成する（アーカイブ内パスは常に `/` 区切り。
    Windows の `Compress-Archive` は `\` 区切りのzipを作り、WPが正しく展開できない）
 
+## 検証
+
+- `settings_test.php` … 保存（sanitize）と設定画面の描画
+- `updater_test.php` … 実際のGitHubに接続して更新通知が出るかを確認
+- `render_preview.php` … `render()` の実出力をダミー記事に埋めたHTMLを書き出す
+  （`php -n render_preview.php out.html <表示%> [段落数]`）。ブラウザで表示タイミングを目視確認する用
+
+```
+C:\Users\yoshi\php-portable\php82\php.exe -n settings_test.php
+C:\Users\yoshi\php-portable\php82\php.exe -n -d extension_dir="C:\Users\yoshi\php-portable\php82\ext" -d extension=curl -d extension=openssl updater_test.php
+```
+
 ## 設計上の決めごと
 
+- **表示タイミングはpxでなく「ページを何%読んだか」**。記事の長さがバラバラでも
+  同じ体感で出せるため（pxだと長い記事では上のほう、短い記事では出ないまま終わる）。
+  スクロールできない短いページは「すでに全部見えている」＝100%とみなして表示する。
+- **初回判定は `load` 後**。画像の読み込みでページ高さが変わるため、確定前に測ると
+  長い記事でもいきなり出てしまう。
 - **ポップアップ本体のCSSはすべてインラインstyle**。テーマのCSSに
   上書きされて潰れる事故を避けるため（相場プラグインで2回やられている）。
 - **閉じた記録は sessionStorage**。localStorage だと二度と出せなくなる。
