@@ -34,8 +34,12 @@ WordPress は最大12時間ごとに更新チェックするため、すぐ見�
 
 - `settings_test.php` … 保存（sanitize）と設定画面の描画
 - `updater_test.php` … 実際のGitHubに接続して更新通知が出るかを確認
-- `render_preview.php` … `render()` の実出力をダミー記事に埋めたHTMLを書き出す
-  （`php -n render_preview.php out.html <表示%> [段落数]`）。ブラウザで表示タイミングを目視確認する用
+- `render_preview.php` … `render()` と `settings_page()` の実出力をHTMLに書き出す
+  （`php -n render_preview.php preview/popup30.html <表示%> [段落数]`。`-admin.html` も一緒に出る）
+
+書き出し先の `preview/` は git 管理外。表示タイミングをブラウザで見るときは
+Claude Code の preview `popup-preview`（`~/.claude/launch.json`・ポート4408）が
+このフォルダを配信する。
 
 ```
 C:\Users\yoshi\php-portable\php82\php.exe -n settings_test.php

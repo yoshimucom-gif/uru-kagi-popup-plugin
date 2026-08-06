@@ -24,6 +24,11 @@ function esc_attr($s) { return htmlspecialchars($s, ENT_QUOTES, 'UTF-8'); }
 function esc_js($s) { return addslashes($s); }
 function current_user_can($c) { return true; }
 function plugin_basename($f) { $f = str_replace('\\', '/', $f); return implode('/', array_slice(explode('/', $f), -2)); }
+function esc_textarea($s) { return htmlspecialchars($s, ENT_QUOTES, 'UTF-8'); }
+function settings_fields($g) {}
+function submit_button() { echo '<p class="submit"><input type="submit" class="button button-primary" value="変更を保存"></p>'; }
+function checked($a, $b = true, $e = true) { if ($a == $b) echo ' checked'; }
+function selected($a, $b = true, $e = true) { if ($a == $b) echo ' selected'; }
 
 require __DIR__ . '/uru-kagi-popup/uru-kagi-popup.php';
 
@@ -88,3 +93,23 @@ HTML;
 
 file_put_contents($out, $html);
 echo "wrote: {$out} (threshold={$pct}%)\n";
+
+/* 設定画面のプレビューも書き出す（wp-admin の見た目を大まかに再現しただけのもの） */
+ob_start();
+$p->settings_page();
+$admin = ob_get_clean();
+$adminOut = preg_replace('/\.html$/', '-admin.html', $out);
+$adminCss = 'body{font-family:sans-serif;background:#f0f0f1;color:#3c434a;margin:0;padding:20px}'
+          . '.wrap{background:#fff;padding:20px 24px;max-width:900px;border:1px solid #c3c4c7}'
+          . 'h1{font-size:23px;font-weight:400;margin:0 0 20px}'
+          . '.form-table{border-collapse:collapse;width:100%}'
+          . '.form-table th{width:200px;text-align:left;vertical-align:top;padding:20px 10px 20px 0;font-weight:600}'
+          . '.form-table td{padding:15px 10px;vertical-align:top}'
+          . '.description{color:#646970;font-size:13px;margin:6px 0 0}'
+          . 'input[type=number],input[type=text],textarea,select{border:1px solid #8c8f94;border-radius:4px;padding:4px 8px}'
+          . '.button-primary{background:#2271b1;color:#fff;border:0;border-radius:3px;padding:6px 14px;cursor:pointer}';
+file_put_contents($adminOut,
+    "<!doctype html><html lang=\"ja\"><head><meta charset=\"utf-8\"><title>設定画面プレビュー</title>"
+    . "<style>{$adminCss}</style>"
+    . "<script src=\"https://code.jquery.com/jquery-3.7.1.min.js\"></script></head><body>{$admin}</body></html>");
+echo "wrote: {$adminOut}\n";
