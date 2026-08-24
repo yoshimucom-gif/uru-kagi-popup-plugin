@@ -43,7 +43,8 @@ $GLOBALS['UKGI_OPTS'] = array(
     'scroll_pct' => $pct,
     'width'      => 320,
     'scope'      => 'all',
-    'show_mobile'=> 1,
+    'devices'    => $argv[4] ?? 'all',   // all / pc / sp
+    'sp_max'     => isset($argv[5]) ? (int)$argv[5] : 767,
     'version'    => 1,
 );
 
@@ -61,6 +62,9 @@ for ($i = 1; $i <= $n; $i++) {
 $html = <<<HTML
 <!doctype html>
 <html lang="ja"><head><meta charset="utf-8">
+<!-- 本番のWordPressテーマは必ずこれを出す。無いとスマホでも画面幅が約980pxとして扱われ、
+     デバイス出し分けのメディアクエリが効かないので、検証条件を本番に合わせる -->
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>ポップアップ表示タイミング検証（{$pct}%）</title>
 <style>body{font-family:sans-serif;max-width:800px;margin:0 auto;padding:20px;line-height:2}
 #meter{position:fixed;left:16px;top:16px;background:#111;color:#fff;padding:6px 10px;border-radius:4px;font-size:13px;z-index:99999}</style>

@@ -1,16 +1,16 @@
 <?php
 /**
- * Plugin Name: 不動産売却のカギ ポップアップ
- * Description: 右下スライドイン型ポップアップ。画像モード（画像＋リンクURL）とショートコードモード（任意HTML）を切替可能。ページを何%読んだら表示するかを指定でき、×で閉じたらセッション中は再表示しない。
- * Version: 1.1.0
- * Author: 不動産売却のカギ
+ * Plugin Name: スライドインポップアップ
+ * Description: 右下からスライドインするポップアップ。画像モード（画像＋リンクURL）とショートコードモード（任意HTML）を切替可能。ページを何%読んだら出すか、PC・スマホのどちらに出すかを指定でき、×で閉じたらセッション中は再表示しない。
+ * Version: 1.2.0
+ * Author: ミカタ株式会社
  * License: GPLv2 or later
  * Text Domain: uru-kagi-popup
  */
 
 if (!defined('ABSPATH')) exit;
 
-define('UKGI_VER', '1.1.0');
+define('UKGI_VER', '1.2.0');
 
 /**
  * 自動更新の置き場（update.json の URL）。
@@ -40,13 +40,21 @@ class Uru_Kagi_Popup {
             'scroll_pct'     => 30,             // 表示トリガー（ページを何%読んだら出すか）
             'width'          => 320,            // ポップアップ幅px（PC）
             'scope'          => 'all',          // all | posts | front
-            'show_mobile'    => 1,
+            'devices'        => 'all',          // all | pc | sp（出し分けは画面幅で行う）
+            'sp_max'         => 767,            // この幅(px)以下をスマホとみなす
             'version'        => 1,              // 変えると閉じた人にも再表示
         );
     }
 
     public static function get() {
-        return wp_parse_args(get_option(self::OPT, array()), self::defaults());
+        $saved = get_option(self::OPT, array());
+        if (!is_array($saved)) $saved = array();
+        // v1.1.0以前は「スマホでも表示する」チェック1つだった。その設定を引き継ぐ
+        if (!isset($saved['devices']) && isset($saved['show_mobile'])) {
+            $saved['devices'] = empty($saved['show_mobile']) ? 'pc' : 'all';
+        }
+        unset($saved['show_mobile']);
+        return wp_parse_args($saved, self::defaults());
     }
 
     public function __construct() {
@@ -59,7 +67,7 @@ class Uru_Kagi_Popup {
     /* ---------- 管理画面 ---------- */
 
     public function admin_menu() {
-        add_options_page('カギ ポップアップ', 'カギ ポップアップ', 'manage_options', 'ukgi-popup', array($this, 'settings_page'));
+        add_options_page('スライドインポップアップ', 'ポップアップ', 'manage_options', 'ukgi-popup', array($this, 'settings_page'));
     }
 
     public function register_settings() {
@@ -87,7 +95,9 @@ class Uru_Kagi_Popup {
         $out['width']          = min(600, max(200, intval($in['width'] ?? $d['width'])));
         $scope                 = $in['scope'] ?? 'all';
         $out['scope']          = in_array($scope, array('all','posts','front'), true) ? $scope : 'all';
-        $out['show_mobile']    = empty($in['show_mobile']) ? 0 : 1;
+        $devices               = $in['devices'] ?? 'all';
+        $out['devices']        = in_array($devices, array('all','pc','sp'), true) ? $devices : 'all';
+        $out['sp_max']         = min(1200, max(320, intval($in['sp_max'] ?? $d['sp_max'])));
         $out['version']        = max(1, intval($in['version'] ?? 1));
         return $out;
     }
@@ -100,7 +110,7 @@ class Uru_Kagi_Popup {
     public function settings_page() {
         $o = self::get(); ?>
         <div class="wrap">
-            <h1>不動産売却のカギ ポップアップ</h1>
+            <h1>スライドインポップアップ</h1>
             <form method="post" action="options.php">
                 <?php settings_fields('ukgi_popup_group'); ?>
                 <table class="form-table" role="presentation">
@@ -169,8 +179,25 @@ class Uru_Kagi_Popup {
                         </td>
                     </tr>
                     <tr>
-                        <th scope="row">スマホ表示</th>
-                        <td><label><input type="checkbox" name="<?php echo self::OPT; ?>[show_mobile]" value="1" <?php checked($o['show_mobile'],1); ?>> スマホでも表示する</label></td>
+                        <th scope="row">表示するデバイス</th>
+                        <td>
+                            <select name="<?php echo self::OPT; ?>[devices]" class="ukgi-devices">
+                                <option value="all" <?php selected($o['devices'],'all'); ?>>PC・スマホの両方</option>
+                                <option value="pc"  <?php selected($o['devices'],'pc'); ?>>PCのみ（スマホには出さない）</option>
+                                <option value="sp"  <?php selected($o['devices'],'sp'); ?>>スマホのみ（PCには出さない）</option>
+                            </select>
+                            <p class="description">画面の幅で判定します。ページのキャッシュを使っているサイトでも正しく出し分けられます。</p>
+                        </td>
+                    </tr>
+                    <tr class="ukgi-row-spmax">
+                        <th scope="row">スマホとみなす幅</th>
+                        <td>
+                            画面幅 <input type="number" name="<?php echo self::OPT; ?>[sp_max]" value="<?php echo esc_attr($o['sp_max']); ?>" min="320" max="1200" step="1" style="width:90px;"> px 以下をスマホとする
+                            <p class="description">
+                                既定の767pxなら、タブレットは横向き＝PC・縦向き＝スマホの扱いになります。<br>
+                                タブレットもPC扱いにしたいときは小さく（例：600）、スマホ扱いにしたいときは大きく（例：1024）してください。
+                            </p>
+                        </td>
                     </tr>
                     <tr>
                         <th scope="row">表示バージョン</th>
@@ -191,6 +218,10 @@ class Uru_Kagi_Popup {
                 $('.ukgi-row-shortcode').toggle(mode==='shortcode');
             }
             $('.ukgi-mode').on('change', toggleRows); toggleRows();
+            function toggleDeviceRow(){
+                $('.ukgi-row-spmax').toggle($('.ukgi-devices').val() !== 'all');
+            }
+            $('.ukgi-devices').on('change', toggleDeviceRow); toggleDeviceRow();
             $('#ukgi-media-btn').on('click', function(e){
                 e.preventDefault();
                 var frame = wp.media({title:'画像を選択', multiple:false, library:{type:'image'}});
@@ -217,8 +248,23 @@ class Uru_Kagi_Popup {
             case 'front': if (!is_front_page()) return false; break;
             case 'posts': if (!is_singular('post')) return false; break;
         }
-        if (!$o['show_mobile'] && wp_is_mobile()) return false;
+        // デバイスの出し分けはここで判定しない。
+        // wp_is_mobile() はサーバー側でブラウザの名乗りを見る方式のため、
+        // ページキャッシュがあるとPC向けのHTMLがそのままスマホにも配られて出し分けが壊れる。
+        // 画面幅のメディアクエリ（device_css）でブラウザ側に判定させる。
         return true;
+    }
+
+    /** 表示するデバイスの指定を、画面幅のメディアクエリに変換する */
+    private function device_css($o) {
+        $bp = intval($o['sp_max']);
+        if ($o['devices'] === 'pc') {
+            return '@media (max-width:' . $bp . 'px){#ukgi-popup{display:none !important}}';
+        }
+        if ($o['devices'] === 'sp') {
+            return '@media (min-width:' . ($bp + 1) . 'px){#ukgi-popup{display:none !important}}';
+        }
+        return '';
     }
 
     public function render() {
@@ -241,7 +287,9 @@ class Uru_Kagi_Popup {
             $inner = '<div class="ukgi-popup-body">'.do_shortcode($o['shortcode_html']).'</div>';
             $card_style = 'background:#fff;padding:16px;';
         }
+        $device_css = $this->device_css($o);
         ?>
+        <?php if ($device_css) : ?><style id="ukgi-popup-css"><?php echo $device_css; ?></style><?php endif; ?>
         <div id="ukgi-popup" aria-hidden="true" style="position:fixed;right:16px;bottom:16px;z-index:99999;width:<?php echo $w; ?>px;max-width:calc(100vw - 32px);opacity:0;transform:translateY(12px);transition:opacity .35s ease,transform .35s ease;pointer-events:none;">
             <div style="position:relative;<?php echo $card_style; ?>border-radius:10px;box-shadow:0 4px 20px rgba(0,0,0,.14);">
                 <button type="button" id="ukgi-popup-close" aria-label="閉じる" style="position:absolute;top:-10px;right:-10px;width:28px;height:28px;border:none;border-radius:50%;background:#333;color:#fff;font-size:14px;line-height:1;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.3);">×</button>
