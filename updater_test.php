@@ -117,7 +117,9 @@ t('中身がzipである（PK ヘッダー）', substr($body, 0, 2), 'PK');
 $info = $updater->plugins_api_filter(false, 'plugin_information', (object)array('slug' => 'uru-kagi-popup'));
 t('プラグイン情報が返る', is_object($info), true);
 if (is_object($info)) {
-    t('名前が入っている', $info->name, '不動産売却のカギ ポップアップ');
+    // 配信中の名前が、手元の update.json と一致するか（push漏れの検出）
+    $local = json_decode(file_get_contents(__DIR__ . '/update.json'), true);
+    t('名前が手元の update.json と一致する', $info->name, $local['name']);
     t('変更履歴が入っている', !empty($info->sections['changelog']), true);
 }
 
